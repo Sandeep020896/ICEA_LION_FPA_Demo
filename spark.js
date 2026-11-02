@@ -1,36 +1,29 @@
-// Builds the ILG FPA - Quotation request from a journey and form. No secrets here.
-import { today } from './format';
-const yn = (v) => (v === 'Yes' || v === true ? 'Yes' : 'No');
+// Spark API Call History: start a CSV download job and poll it (Spark docs: API Call History APIs).
+const env = (k) => process.env[k] || '';
+const base = () => `${env('SPARK_BASE_URL')}/${env('SPARK_TENANT')}/api/v3/folders/${encodeURIComponent(env('SPARK_FOLDER'))}/services/${encodeURIComponent(env('SPARK_QUOTE_SERVICE'))}/log/downloadcsv`;
+const headers = () => ({ 'Content-Type': 'application/json', 'x-tenant-name': env('SPARK_TENANT'), 'x-synthetic-key': env('SPARK_API_KEY') });
+export const sparkConfigured = () => !!(env('SPARK_BASE_URL') && env('SPARK_API_KEY'));
 
-export function buildInputs(journey, f, x = {}) {
-  const d = today();
-  const kids = (f.childAges || []).map((a) => Number(a) || 0);
-  const parents = Number(f.numParents) || 0;
-  const spouse = yn(f.spouseCovered);
-  const inputs = {
-    Req_Profile: journey.profile, Req_QuoteDate: d, Req_Channel: journey.channel, Req_Partner: journey.partner,
-    Req_Region: f.region, Req_Locale: 'en_KE', Req_ApplicantAge: Number(f.applicantAge), Req_IncomeType: f.incomeType,
-    Req_MonthlyIncome: Number(f.monthlyIncome), Req_OccupationClass: f.occupation, Req_TobaccoUser: yn(f.tobacco),
-    Req_HospitalisedLast12M: 'No', Req_KYCVerified: 'Yes', Req_SpouseCovered: spouse, Req_SpouseAge: spouse === 'Yes' ? Number(f.spouseAge) : 0,
-    Req_NumChildren: kids.length, Req_NumParents: parents, Req_EldestParentAge: parents > 0 ? Number(f.eldestParentAge) : 0,
-    Req_CoverLevel: f.coverLevel, Req_BaseSumAssured: Number(f.baseSumAssured), Req_PA_Selected: yn(f.paSelected),
-    Req_PA_SumAssured: Number(f.paSumAssured), Req_HC_Selected: yn(f.hcSelected), Req_HC_DailyBenefit: Number(f.hcDaily),
-    QuoteDate: d, AcceptanceDate: d,
-    CustomerRef: x.customerRef, CustomerName: x.customerRef, // no personal data to Spark: the reference stands in for the name
-    QuoteID: x.quoteId || null, PriorRevision: x.priorRevision || 0, QuotedProductVersion: x.quotedProductVersion || null,
-    IllustrationYears: 10, RequestedPlan: f.plan, PaymentMethod: f.method, TargetInstalment: 0,
-    ChildAges: kids.map((a) => ({ Child_Age: a }))
-  };
-  if (x.documents) {
-    inputs.QUOTE = { FileName: `Quote_${x.customerRef}.pdf` };
-    inputs.BENEFITILLUSTRATION = { FileName: `Illustration_${x.customerRef}.pdf` };
-  }
-  return inputs;
+export async function startLogJob(correlationId) {
+  const body = { request_data: { call_ids: [correlationId], include_inputs: true, include_outputs: true, timezone_offset: 180 }, request_meta: {} };
+  const r = await fetch(base(), { method: 'POST', headers: headers(), body: JSON.stringify(body), cache: 'no-store' });
+  const text = await r.text(); let data = null; try { data = JSON.parse(text); } catch {}
+  return { httpStatus: r.status, data, text: data ? null : text.slice(0, 300), jobId: findKey(data, /job_?id/i) };
 }
-
-export function buildRequest(journey, f, x) {
-  return {
-    request_data: { inputs: buildInputs(journey, f, x) },
-    request_meta: { call_purpose: `ICEA POC - ${journey.label}`, source_system: 'ICEA-Channels', correlation_id: x.correlationId, transaction_date: x.asOf || null }
-  };
+export async function pollLogJob(jobId) {
+  const r = await fetch(`${base()}/status/${encodeURIComponent(jobId)}`, { headers: headers(), cache: 'no-store' });
+  const text = await r.text(); let data = null; try { data = JSON.parse(text); } catch {}
+  return { httpStatus: r.status, data, text: data ? null : text.slice(0, 300), status: findKey(data, /^status$/i) || findKey(data, /status/i), url: findUrl(data) };
+}
+function findKey(o, re, d = 0) {
+  if (!o || typeof o !== 'object' || d > 5) return null;
+  for (const [k, v] of Object.entries(o)) { if (re.test(k) && (typeof v === 'string' || typeof v === 'number')) return String(v); }
+  for (const v of Object.values(o)) { const f = findKey(v, re, d + 1); if (f) return f; }
+  return null;
+}
+function findUrl(o, d = 0) {
+  if (!o || d > 6) return null;
+  if (typeof o === 'string') return /^https?:\/\//.test(o) ? o : null;
+  if (typeof o === 'object') for (const v of Object.values(o)) { const f = findUrl(v, d + 1); if (f) return f; }
+  return null;
 }

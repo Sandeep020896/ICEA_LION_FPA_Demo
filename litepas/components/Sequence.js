@@ -8,8 +8,8 @@ function rowsFor(e) {
   const at = time(e.at || e.receivedAt);
   const ok = e.httpStatus === 200 || e.httpStatus === 201 || (!e.httpStatus && e.type !== 'quote.rejected');
   const r = e.response || {};
-  if (['quote.requested', 'quote.revised', 'documents.requested'].includes(e.type)) {
-    const verb = e.type === 'quote.revised' ? `revise quote (rev ${e.revision || ''})` : e.type === 'documents.requested' ? 'produce documents' : 'request a quote';
+  if (['quote.requested', 'quote.revised', 'documents.requested', 'quote.acceptance'].includes(e.type)) {
+    const verb = e.type === 'quote.acceptance' ? 'confirm price at acceptance' : e.type === 'quote.revised' ? `revise quote (rev ${e.revision || ''})` : e.type === 'documents.requested' ? 'produce documents' : 'request a quote';
     if (!ok) return [{ at, from: 0, to: 1, kind: 'bad', label: `${e.from}: ${verb}, HTTP ${e.httpStatus || 'no response'}` }];
     const p = tr(e, 'Product'), q = tr(e, 'Rating');
     return [

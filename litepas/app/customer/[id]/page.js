@@ -18,7 +18,7 @@ export default function Customer({ params }) {
     Number(b.PA_Accidental_Death) > 0 && `An extra ${kes(b.PA_Accidental_Death)} if death is accidental`,
     Number(b.HC_Daily) > 0 && `${kes(b.HC_Daily)} for each night in hospital`
   ].filter(Boolean);
-  const NAMES = { Quoted: 'Quote given', Documents: 'Documents issued', Accepted: 'You accepted the quote', Bound: 'Cover started', Certificate: 'Certificate issued' };
+  const NAMES = { Quoted: 'Quote given', Documents: 'Documents issued', Accepted: 'You accepted the quote', Bound: 'Cover started', Certificate: 'Certificate issued', 'Price confirmed': 'Price confirmed' };
   const hist = journeyPath(d.events).filter((n) => n.e && n.label !== 'CRM updated').map((n) => ({ ...n, label: NAMES[n.label] || (n.label.startsWith('Revised') ? 'Quote updated' : n.label) }));
   return (
     <div className="cv">

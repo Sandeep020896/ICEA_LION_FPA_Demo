@@ -195,7 +195,11 @@ li[data-state="stopped"] .sdetail{color:var(--warn)}
 .app-body .fgrid{grid-template-columns:1fr 1fr;gap:10px}
 .app-body .price .amt{font-size:38px}
 .app-body .covers{grid-template-columns:1fr}
-.pdetails{background:#fff;border:1px solid var(--line);border-radius:16px;margin-top:10px}
+.pdetails{background:#fff;border:1px solid var(--line);border-radius:16px;margin-bottom:10px;overflow:hidden}
+.psum{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;background:#fff;border:0;cursor:pointer;text-align:left}
+.psum b{display:block;font-size:13.5px;font-weight:600}
+.psum .sub{font-size:12px}
+.pedit{font-size:13px;font-weight:600;color:var(--brand);background:var(--brand-soft);border-radius:999px;padding:4px 12px;flex-shrink:0}
 .pdetails summary{cursor:pointer;padding:14px 16px;font-weight:600;font-size:14px;list-style:none;display:flex;justify-content:space-between;align-items:center}
 .pdetails summary::-webkit-details-marker{display:none}
 .pdetails summary::after{content:'';width:8px;height:8px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(45deg);margin-top:-4px}

@@ -14,9 +14,9 @@ const QSTEPS = [
   { key: 'quote', label: 'Payment plans applied and quote issued' }
 ];
 const ASTEPS = [
-  { key: 'docs', label: 'Quote documents produced by Spark' },
+  { key: 'docs', label: 'Price confirmed by Spark at acceptance' },
   { key: 'send', label: 'Accepted quote sent to LitePAS' },
-  { key: 'policy', label: 'Policy created' },
+  { key: 'policy', label: 'Policy bound by LitePAS' },
   { key: 'crm', label: 'Customer record updated' }
 ];
 const PARTNER_CARDS = [
@@ -55,6 +55,7 @@ export default function App() {
   const [calls, setCalls] = useState([]);
   const [hood, setHood] = useState(false);
   const [tray, setTray] = useState(true);
+  const [editing, setEditing] = useState(false);
   const sref = useRef(sessions); sref.current = sessions;
   const fref = useRef(forms); fref.current = forms;
 
@@ -100,19 +101,23 @@ export default function App() {
     const setStep = (key, state, detail) => upd((a) => ({ ...a, steps: a.steps.map((x) => (x.key === key ? { ...x, state, detail } : x)) }));
     patchQ(k, { accept: job }); setTray(true);
     try {
-      setStep('docs', 'running', 'Rendering the quote and benefit illustration');
-      const d = s.q.docs && !s.q.docs.none ? { docs: s.q.docs } : await getDocs(k);
-      const n = [d.docs?.quote, d.docs?.illustration].filter(Boolean).length;
-      setStep('docs', n ? 'done' : 'skipped', n ? `${n} PDFs ready` : 'Spark returned no documents');
+      setStep('docs', 'running', 'Re-checking validity, versions and price with Spark');
+      const ax = { asOf: s.asOf, customerRef: s.customerRef, correlationId: s.correlationId, documents: true, acceptance: true, quoteId: o.QuoteReference, priorRevision: Math.max(0, (o.QuoteRevision || 1) - 1), quotedProductVersion: o.ProductVersionQuoted };
+      const chk = await post(k, ax, 'Acceptance check');
+      const co = chk.outputs || {};
+      if (!chk.outputs || chk.httpStatus !== 200) { setStep('docs', 'failed', chk.error || 'Spark did not answer the acceptance check'); upd((a) => ({ ...a, status: 'failed' })); return; }
+      if (!['QUOTED', 'QUOTED - SUBJECT TO UNDERWRITING'].includes(co.QuoteStatus)) { setStep('docs', 'stopped', `${co.QuoteStatus}: ${co.QuoteStatusReason || ''}. Re-quote before accepting.`); upd((a) => ({ ...a, status: 'failed' })); return; }
+      const d = { docs: { quote: co.QUOTE?.PDFUrl || s.q.docs?.quote || null, illustration: co.BENEFITILLUSTRATION?.PDFUrl || s.q.docs?.illustration || null } };
+      setStep('docs', 'done', `${co.QuoteStatus}, ${kes(co.Instalment)} ${perLabel(co.AppliedPlan)}; Spark call ${chk.meta?.call_id || ''}`);
       setStep('send', 'running', 'POST to LitePAS with the integration payload');
       const r = await fetch('/api/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ journey: k, outputs: o, asOf: s.asOf, correlationId: s.correlationId, customerName: fref.current[k].name, customerRef: s.customerRef, callId: s.q.meta?.call_id, documents: d.docs }) }).then((x) => x.json());
+        body: JSON.stringify({ journey: k, outputs: o, asOf: s.asOf, correlationId: s.correlationId, customerName: fref.current[k].name, customerRef: s.customerRef, callId: s.q.meta?.call_id, acceptanceCallId: chk.meta?.call_id || null, documents: d.docs }) }).then((x) => x.json());
       const res = r.result || {};
       if (res.skipped) { setStep('send', 'skipped', 'LitePAS is not connected yet (set LITEPAS_URL)'); setStep('policy', 'skipped', null); setStep('crm', 'skipped', null); upd((a) => ({ ...a, status: 'notsent' })); return; }
       if (!res.ok) { setStep('send', 'failed', res.error || `LitePAS answered HTTP ${res.status}`); upd((a) => ({ ...a, status: 'failed' })); return; }
       setStep('send', 'done', `HTTP ${res.status} in ${res.durationMs} ms`);
       const pol = res.data?.policy || {};
-      setStep('policy', pol.policyNumber ? 'done' : 'failed', pol.policyNumber ? `${pol.policyNumber}, status ${pol.status || 'Bound'}` : 'LitePAS did not return a policy number');
+      setStep('policy', pol.policyNumber ? 'done' : 'failed', pol.policyNumber ? `${pol.policyNumber} bound; certificate issued` : 'LitePAS did not return a policy number');
       setStep('crm', res.data?.crm ? 'done' : 'skipped', res.data?.crm ? `${res.data.crm.reference}: ${res.data.crm.segment || ''}` : 'No CRM update reported');
       upd((a) => ({ ...a, status: 'done', policy: { ...pol, url: pol.policyNumber ? `${res.litepasUrl}/policies/${pol.policyNumber}` : null } }));
     } catch (e) {
@@ -204,12 +209,19 @@ export default function App() {
                 <p>{journey.blurb}</p>
               </div>
               <div className="app-body">
+                <div className="pdetails">
+                  <button type="button" className="psum" onClick={() => setEditing(!editing)} aria-expanded={editing}>
+                    <span><b>Your details</b><span className="sub">Age {form.applicantAge}{form.spouseCovered === 'Yes' ? ', spouse' : ''}{form.childAges.length ? `, ${form.childAges.length} ${form.childAges.length === 1 ? 'child' : 'children'}` : ''}, cover KES {Number(form.baseSumAssured || 0).toLocaleString('en-KE')}</span></span>
+                    <span className="pedit">{editing ? 'Done' : 'Edit'}</span>
+                  </button>
+                  {editing && (
+                    <>
+                      <QuoteForm form={form} set={setForm} journey={journey} compact />
+                      <div style={{ padding: '0 14px 14px' }}><button className="btn primary big" disabled={q.loading || !q.dirty} onClick={() => { runQuote(jkey, { revise: true }); setEditing(false); }}>{q.loading && <Spinner light />}{q.dirty ? 'Update my quote' : 'No changes yet'}</button></div>
+                    </>
+                  )}
+                </div>
                 {offer}
-                <details className="pdetails" open={!q.outputs}>
-                  <summary>Change your details</summary>
-                  <QuoteForm form={form} set={setForm} journey={journey} compact />
-                  {q.dirty && <div style={{ padding: '0 18px 8px' }}><button className="btn primary big" disabled={q.loading} onClick={() => runQuote(jkey, { revise: true })}>{q.loading && <Spinner light />}Update quote</button></div>}
-                </details>
                 <div className="powered">Cover provided by ICEA LION Life and ICEA LION General</div>
               </div>
             </div></div>

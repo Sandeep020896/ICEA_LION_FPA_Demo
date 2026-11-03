@@ -43,7 +43,7 @@ export async function certificatePdf(p) {
   y -= 6; section('Rating basis');
   row('Versions priced on', `Product ${q.productVersion || '-'}, Rating ${q.ratingVersion || '-'}, Quote ${q.quoteVersion || '-'}`);
   row('Priced as of', q.asOf ? new Date(q.asOf).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : '-');
-  row('Quote reference', `${q.reference || '-'} revision ${q.revision || '-'}`); row('Spark call', q.sparkCallId || '-');
+  row('Quote reference', `${q.reference || '-'} revision ${q.revision || '-'}`); row('Accepted via Spark call', q.acceptanceCallId || q.sparkCallId || '-');
   row('Sold through', `${p.partnerLabel || brand.name} (${p.channel})`);
   y -= 10;
   const notes = ['Benefits are subject to the waiting periods and exclusions in the policy schedule.', 'This certificate is issued by the policy administration system from the accepted quote; the quote and benefit',

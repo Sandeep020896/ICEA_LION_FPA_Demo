@@ -5,6 +5,7 @@ export function describe(e) {
   switch (e.type) {
     case 'quote.requested': return { title: 'Quote requested', detail: `${e.from}: ${r.QuoteStatus || e.quoteStatus || ''}${r.Instalment ? `, ${kes(r.Instalment)} ${perLabel(r.AppliedPlan)}` : ''}` };
     case 'quote.revised': return { title: `Quote revised (rev ${e.revision || ''})`, detail: `${r.QuoteStatus || e.quoteStatus || ''}${r.Instalment ? `, ${kes(r.Instalment)} ${perLabel(r.AppliedPlan)}` : ''}` };
+    case 'quote.acceptance': return { title: 'Price confirmed by Spark at acceptance', detail: `${r.QuoteStatus || e.quoteStatus || ''}${r.Instalment ? `, ${kes(r.Instalment)} ${perLabel(r.AppliedPlan)}` : ''}` };
     case 'documents.requested': return { title: 'Quote documents produced', detail: 'Quote and benefit illustration PDFs from Spark' };
     case 'quote.accepted': return { title: 'Quote accepted', detail: `Received from ${e.from}` };
     case 'quote.rejected': return { title: 'Hand-off rejected', detail: r.error || 'LitePAS could not bind this quote' };

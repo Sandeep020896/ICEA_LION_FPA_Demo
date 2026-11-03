@@ -8,6 +8,7 @@ export function journeyPath(events) {
     { label: 'Quoted', e: first('quote.requested') },
     { label: revs.length ? `Revised ${revs.length}x` : 'Revised', e: revs[revs.length - 1], optional: true },
     { label: 'Documents', e: first('documents.requested'), optional: true },
+    { label: 'Price confirmed', e: first('quote.acceptance'), optional: true },
     { label: 'Accepted', e: first('quote.accepted') },
     { label: 'Bound', e: first('policy.bound') },
     { label: 'Certificate', e: first('certificate.issued'), optional: true },

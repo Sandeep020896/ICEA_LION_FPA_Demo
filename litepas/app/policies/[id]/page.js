@@ -17,8 +17,10 @@ function ledger(events, q) {
     rows.push({ type: e.type === 'quote.revised' ? `Quote, revision ${e.revision || ''}` : 'Quote', status: accepted ? 'Accepted' : String(e.quoteStatus || '').startsWith('NOT') ? 'Not quoted' : 'Superseded', tone: accepted ? 'ok' : String(e.quoteStatus || '').startsWith('NOT') ? 'warn' : '',
       premium: kes0(e.response?.Instalment, e.response?.AppliedPlan), versions: [tr('Product') && `P ${tr('Product').Version}`, tr('Rating') && `R ${tr('Rating').Version}`].filter(Boolean).join(', ') || '-', callId: e.callId, at: e.at || e.receivedAt });
   });
+  const ac = events.filter((e) => e.type === 'quote.acceptance').pop();
+  if (ac) rows.push({ type: 'Acceptance check', status: 'Confirmed', tone: 'ok', premium: kes0(ac.response?.Instalment, ac.response?.AppliedPlan), versions: (ac.serviceTrace || []).filter((t) => !String(t.Service).includes('Quote')).map((t) => (String(t.Service).includes('Product') ? 'P ' : 'R ') + t.Version).join(', ') || '-', callId: ac.callId, at: ac.at || ac.receivedAt });
   const bound = events.find((e) => e.type === 'policy.bound');
-  if (bound) rows.push({ type: 'New business', status: 'Bound', tone: 'ok', premium: `${kes(q.annualPremium)} a year`, versions: `P ${q.productVersion || '-'}, R ${q.ratingVersion || '-'}, Q ${q.quoteVersion || '-'}`, callId: q.sparkCallId, at: bound.at || bound.receivedAt });
+  if (bound) rows.push({ type: 'New business', status: 'Bound', tone: 'ok', premium: `${kes(q.annualPremium)} a year`, versions: `P ${q.productVersion || '-'}, R ${q.ratingVersion || '-'}, Q ${q.quoteVersion || '-'}`, callId: q.acceptanceCallId || q.sparkCallId, at: bound.at || bound.receivedAt });
   return rows;
 }
 
@@ -57,7 +59,7 @@ export default function PolicyPage({ params }) {
         <b>Rating basis</b>
         <span>Product {q.productVersion}</span><span>Rating {q.ratingVersion}</span><span>Quote {q.quoteVersion}</span>
         {q.asOf && <span>as of <span className="mono">{when(q.asOf)}</span></span>}
-        <span className="mono">Spark call {q.sparkCallId}</span>
+        <span className="mono">Accepted via Spark call {q.acceptanceCallId || q.sparkCallId}</span>
         <span className="sub">This policy keeps the versions it was priced on. Later approved versions apply to new business only.</span>
       </div>
 

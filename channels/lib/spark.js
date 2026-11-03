@@ -31,6 +31,6 @@ export function buildInputs(journey, f, x = {}) {
 export function buildRequest(journey, f, x) {
   return {
     request_data: { inputs: buildInputs(journey, f, x) },
-    request_meta: { call_purpose: `ICEA POC - ${journey.label}`, source_system: 'ICEA-Channels', correlation_id: x.correlationId, transaction_date: x.asOf || null }
+    request_meta: { call_purpose: `ICEA POC - ${journey.label}${x.acceptance ? ' - Acceptance' : ''}`, source_system: 'ICEA-Channels', correlation_id: x.correlationId, transaction_date: x.asOf || null }
   };
 }

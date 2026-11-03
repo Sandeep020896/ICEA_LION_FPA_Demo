@@ -19,7 +19,7 @@ export async function POST(req) {
       productVersion: o.ProductVersionQuoted, ratingVersion: o.RatingVersionQuoted, quoteVersion: o.ServiceVersionLabel,
       annualPremium: o.ResolvedInputs?.find?.((r) => r.Field === 'AnnualPremium')?.Value, instalment: o.Instalment, firstInstalment: o.FirstInstalment,
       plan: o.AppliedPlan, method: o.AppliedMethod, coverStart: o.CoverStartDate, renewal: o.RenewalDate, riders: o.RiderCodes,
-      sparkCallId: b.callId, documents: b.documents || null, asOf: b.asOf || null
+      sparkCallId: b.callId, acceptanceCallId: b.acceptanceCallId || null, documents: b.documents || null, asOf: b.asOf || null
     },
     integrationPayload: o.IntegrationPayload || [], resolvedInputs: o.ResolvedInputs || [], schedule: o.InstalmentSchedule || [],
     benefits: (o.Illustration || [])[0] || null, serviceTrace: o.ServiceTrace || [], glPostings: o.GLPostings || []

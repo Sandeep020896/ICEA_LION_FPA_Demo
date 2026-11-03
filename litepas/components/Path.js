@@ -10,6 +10,7 @@ export function journeyPath(events) {
     { label: 'Documents', e: first('documents.requested'), optional: true },
     { label: 'Price confirmed', e: first('quote.acceptance'), optional: true },
     { label: 'Accepted', e: first('quote.accepted') },
+    { label: 'Underwriting', e: first('underwriting.approved') || (first('policy.referred') && !first('policy.bound') ? null : undefined), optional: !first('policy.referred') },
     { label: 'Bound', e: first('policy.bound') },
     { label: 'Certificate', e: first('certificate.issued'), optional: true },
     { label: 'CRM updated', e: first('crm.updated') }

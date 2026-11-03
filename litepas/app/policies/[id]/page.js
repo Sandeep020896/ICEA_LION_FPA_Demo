@@ -20,12 +20,16 @@ function ledger(events, q) {
   const ac = events.filter((e) => e.type === 'quote.acceptance').pop();
   if (ac) rows.push({ type: 'Acceptance check', status: 'Confirmed', tone: 'ok', premium: kes0(ac.response?.Instalment, ac.response?.AppliedPlan), versions: (ac.serviceTrace || []).filter((t) => !String(t.Service).includes('Quote')).map((t) => (String(t.Service).includes('Product') ? 'P ' : 'R ') + t.Version).join(', ') || '-', callId: ac.callId, at: ac.at || ac.receivedAt });
   const bound = events.find((e) => e.type === 'policy.bound');
+  const uw = events.find((e) => e.type === 'underwriting.approved');
+  if (uw) rows.push({ type: 'Underwriting approval', status: 'Approved', tone: 'ok', premium: '-', versions: '-', callId: null, at: uw.at || uw.receivedAt });
   if (bound) rows.push({ type: 'New business', status: 'Bound', tone: 'ok', premium: `${kes(q.annualPremium)} a year`, versions: `P ${q.productVersion || '-'}, R ${q.ratingVersion || '-'}, Q ${q.quoteVersion || '-'}`, callId: q.acceptanceCallId || q.sparkCallId, at: bound.at || bound.receivedAt });
   return rows;
 }
 
 export default function PolicyPage({ params }) {
-  const [d, setD] = useState(null); const [err, setErr] = useState(null); const [raw, setRaw] = useState(false);
+  const [d, setD] = useState(null); const [err, setErr] = useState(null); const [raw, setRaw] = useState(false); const [busy, setBusy] = useState(false);
+  const load = () => fetch('/api/policies/' + params.id).then(async (r) => { if (!r.ok) throw new Error('Could not load the policy.'); return r.json(); }).then(setD).catch((e) => setErr(e.message));
+  const approve = async () => { setBusy(true); await fetch(`/api/policies/${params.id}/bind`, { method: 'POST' }); setBusy(false); load(); };
   useEffect(() => { fetch('/api/policies/' + params.id).then(async (r) => { if (!r.ok) throw new Error(r.status === 404 ? 'There is no policy with this number.' : 'Could not load the policy.'); return r.json(); }).then(setD).catch((e) => setErr(e.message)); }, [params.id]);
   if (err) return <main className="page"><div className="panel empty">{err} <Link href="/policies">Back to policies</Link></div></main>;
   if (!d) return <main className="page"><div className="panel empty">Loading {params.id}</div></main>;
@@ -37,7 +41,7 @@ export default function PolicyPage({ params }) {
       <div className="crumb"><Link href="/policies">Policies</Link> / <span className="mono">{p.policyNumber}</span></div>
       <div className="ph">
         <div>
-          <h1><span className="mono" style={{ fontSize: 24, fontWeight: 500 }}>{p.policyNumber}</span><span className="badge ok">{p.status}</span><span className="badge ch"><span className="dotc" style={{ background: brand?.color }} />{channelOf(p)}</span></h1>
+          <h1><span className="mono" style={{ fontSize: 24, fontWeight: 500 }}>{p.policyNumber}</span><span className={"badge " + (p.status === "Bound" ? "ok" : "warn")}>{p.status}</span><span className="badge ch"><span className="dotc" style={{ background: brand?.color }} />{channelOf(p)}</span></h1>
           <p>{p.customer?.name}, {productName(q.product)}, {q.plan} by {q.method}. Bound {when(p.createdAt)}{p.seeded ? ' (demo record)' : ''}.</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -46,6 +50,12 @@ export default function PolicyPage({ params }) {
         </div>
       </div>
 
+      {p.status === 'Pending underwriting' && (
+        <div className="panel pad" style={{ marginBottom: 16, borderColor: '#F6DDB4', background: '#FFF9EE', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+          <div><b>Pending underwriting.</b> <span className="sub">The quote was issued subject to underwriting ({q.status}). The policy is not bound, and no certificate is issued, until an underwriter approves it.</span></div>
+          <button className="btn primary" disabled={busy} onClick={approve}>{busy ? 'Binding' : 'Approve and bind'}</button>
+        </div>
+      )}
       <div className="panel pad"><div className="h3">Lifecycle</div><Path events={d.events} /></div>
 
       <div className="tiles">
@@ -104,7 +114,7 @@ export default function PolicyPage({ params }) {
             <div className="h3">Documents</div>
             <div className="sub" style={{ marginBottom: 6 }}>Issued by LitePAS</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-              <a className="btn primary" href={`/api/policies/${p.policyNumber}/certificate`} target="_blank" rel="noreferrer">Certificate of insurance</a>
+              {p.status === 'Bound' ? <a className="btn primary" href={`/api/policies/${p.policyNumber}/certificate`} target="_blank" rel="noreferrer">Certificate of insurance</a> : <span className="sub">Issued once the policy is bound.</span>}
               <a className="btn" href={`/api/policies/${p.policyNumber}/certificate?dl=1`}>Download</a>
             </div>
             <div className="sub" style={{ marginBottom: 6 }}>Produced by Spark at quote stage</div>

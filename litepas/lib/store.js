@@ -48,10 +48,15 @@ export async function createPolicy(payload, { skipSeed } = {}) {
   const t0 = Date.now(); const at = new Date(t0).toISOString(); const at1 = new Date(t0 + 1).toISOString(); const at2 = new Date(t0 + 2).toISOString(); const at3 = new Date(t0 + 3).toISOString();
   const payloadMap = Object.fromEntries((payload.integrationPayload || []).map((r) => [r.Field, r.Value]));
   const crm = { reference: 'CRM-' + String(n).padStart(6, '0'), segment: payloadMap.CRM_Segment || null, nextBestAction: payloadMap.Next_Best_Action || null };
-  const policy = { policyNumber, status: 'Bound', createdAt: at, ...payload, crm };
+  const referred = String(payload.quote?.status || '').includes('UNDERWRITING');
+  const policy = { policyNumber, status: referred ? 'Pending underwriting' : 'Bound', createdAt: at, ...payload, crm };
   await pushList('policies', policy);
   const base = { correlationId: payload.correlationId, channel: payload.channel, partner: payload.partner, journey: payload.journey, quoteReference: payload.quote?.reference, revision: payload.quote?.revision };
   await addEvent({ ...base, type: 'quote.accepted', at, from: payload.partnerLabel, to: 'LitePAS', httpStatus: 201, request: payload, response: { policyNumber } });
+  if (referred) {
+    await addEvent({ ...base, type: 'policy.referred', at: at1, from: 'LitePAS', to: 'LitePAS', policyNumber, response: { policyNumber, status: 'Pending underwriting', reason: 'Quote was issued subject to underwriting' } });
+    return { policy: { policyNumber, status: 'Pending underwriting' }, crm: null };
+  }
   await addEvent({ ...base, type: 'policy.bound', at: at1, from: 'LitePAS', to: 'LitePAS', policyNumber, response: { policyNumber, status: 'Bound', product: payload.quote?.product, productVersion: payload.quote?.productVersion, ratingVersion: payload.quote?.ratingVersion } });
   await addEvent({ ...base, type: 'certificate.issued', at: at2, from: 'LitePAS', to: 'LitePAS', policyNumber, response: { document: 'Certificate of insurance', url: `/api/policies/${policyNumber}/certificate` } });
   await addEvent({ ...base, type: 'crm.updated', at: at3, from: 'LitePAS', to: 'CRM', policyNumber, httpStatus: 200, request: { customerReference: payload.customer?.reference, policyNumber, segment: crm.segment, nextBestAction: crm.nextBestAction }, response: { crmReference: crm.reference } });
@@ -78,4 +83,21 @@ async function seedIfEmpty() {
       integrationPayload: o.IntegrationPayload, resolvedInputs: o.ResolvedInputs, schedule: o.InstalmentSchedule, benefits: (o.Illustration || [])[0], serviceTrace: o.ServiceTrace, glPostings: o.GLPostings
     }, { skipSeed: true });
   }
+}
+
+// Underwriter approves a referred policy: bind it, issue the certificate, update the customer record.
+export async function approveAndBind(id, by = 'Underwriter') {
+  const all = await listPolicies();
+  const p = all.find((x) => x.policyNumber === id);
+  if (!p) return { error: 'Not found', status: 404 };
+  if (p.status !== 'Pending underwriting') return { error: `Policy is ${p.status}`, status: 409 };
+  const t0 = Date.now(); const at = (k) => new Date(t0 + k).toISOString();
+  p.status = 'Bound'; p.approvedAt = at(0); p.approvedBy = by;
+  await replaceList('policies', all);
+  const base = { correlationId: p.correlationId, channel: p.channel, partner: p.partner, journey: p.journey, quoteReference: p.quote?.reference, revision: p.quote?.revision };
+  await addEvent({ ...base, type: 'underwriting.approved', at: at(0), from: by, to: 'LitePAS', policyNumber: id, response: { policyNumber: id, approvedBy: by } });
+  await addEvent({ ...base, type: 'policy.bound', at: at(1), from: 'LitePAS', to: 'LitePAS', policyNumber: id, response: { policyNumber: id, status: 'Bound', product: p.quote?.product, productVersion: p.quote?.productVersion, ratingVersion: p.quote?.ratingVersion } });
+  await addEvent({ ...base, type: 'certificate.issued', at: at(2), from: 'LitePAS', to: 'LitePAS', policyNumber: id, response: { document: 'Certificate of insurance', url: `/api/policies/${id}/certificate` } });
+  await addEvent({ ...base, type: 'crm.updated', at: at(3), from: 'LitePAS', to: 'CRM', policyNumber: id, httpStatus: 200, request: { customerReference: p.customer?.reference, policyNumber: id, segment: p.crm?.segment, nextBestAction: p.crm?.nextBestAction }, response: { crmReference: p.crm?.reference } });
+  return { policy: { policyNumber: id, status: 'Bound' } };
 }

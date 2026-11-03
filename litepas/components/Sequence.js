@@ -22,6 +22,8 @@ function rowsFor(e) {
   if (e.type === 'quote.accepted') return [{ at, from: 0, to: 4, label: `${e.from}: accepted ${e.quoteReference || ''}` }];
   if (e.type === 'quote.rejected') return [{ at, from: 0, to: 4, kind: 'bad', label: `rejected: ${r.error || 'HTTP ' + e.httpStatus}` }];
   if (e.type === 'policy.bound') return [{ at, self: 4, label: `${e.policyNumber} bound` }];
+  if (e.type === 'policy.referred') return [{ at, self: 4, label: `${e.policyNumber} pending underwriting` }];
+  if (e.type === 'underwriting.approved') return [{ at, self: 4, label: 'underwriting approved' }];
   if (e.type === 'certificate.issued') return [{ at, self: 4, label: 'certificate of insurance issued' }];
   if (e.type === 'crm.updated') return [{ at, from: 4, to: 5, label: `${r.crmReference || 'customer record'} updated` }];
   return [{ at, self: 0, label: e.type }];

@@ -26,7 +26,7 @@ export default function Customer({ params }) {
       <div className="cv-in">
         <div className="sub">Policy {p.policyNumber}</div>
         <h1>Hello {first || 'there'}</h1>
-        <div className="covered">You're covered. {productName(q.product)} starts on {q.coverStart}.</div>
+        {p.status === 'Bound' ? <div className="covered">You're covered. {productName(q.product)} starts on {q.coverStart}.</div> : <div className="covered" style={{ background: '#FFF6E8', borderColor: '#F6DDB4', color: '#A35F00' }}>Thank you. Your application is with our underwriters; we will confirm your cover shortly.</div>}
         <div className="grid2">
           <div className="card"><div className="sub" style={{ marginBottom: 8 }}>What you're covered for</div><ul className="ck">{covers.map((c) => <li key={c}>{c}</li>)}</ul></div>
           <div className="card" style={{ textAlign: 'center' }}>

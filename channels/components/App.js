@@ -117,8 +117,9 @@ export default function App() {
       if (!res.ok) { setStep('send', 'failed', res.error || `LitePAS answered HTTP ${res.status}`); upd((a) => ({ ...a, status: 'failed' })); return; }
       setStep('send', 'done', `HTTP ${res.status} in ${res.durationMs} ms`);
       const pol = res.data?.policy || {};
-      setStep('policy', pol.policyNumber ? 'done' : 'failed', pol.policyNumber ? `${pol.policyNumber} bound; certificate issued` : 'LitePAS did not return a policy number');
-      setStep('crm', res.data?.crm ? 'done' : 'skipped', res.data?.crm ? `${res.data.crm.reference}: ${res.data.crm.segment || ''}` : 'No CRM update reported');
+      const pending = pol.status === 'Pending underwriting';
+      setStep('policy', pol.policyNumber ? (pending ? 'stopped' : 'done') : 'failed', pol.policyNumber ? (pending ? `${pol.policyNumber} pending underwriting: referred quotes are bound after approval` : `${pol.policyNumber} bound; certificate issued`) : 'LitePAS did not return a policy number');
+      setStep('crm', res.data?.crm ? 'done' : 'skipped', res.data?.crm ? `${res.data.crm.reference}: ${res.data.crm.segment || ''}` : (pending ? 'Updated once the policy is bound' : 'No CRM update reported'));
       upd((a) => ({ ...a, status: 'done', policy: { ...pol, url: pol.policyNumber ? `${res.litepasUrl}/policies/${pol.policyNumber}` : null } }));
     } catch (e) {
       upd((a) => ({ ...a, status: 'failed', steps: a.steps.map((x) => (x.state === 'running' ? { ...x, state: 'failed', detail: e.message } : x)) }));

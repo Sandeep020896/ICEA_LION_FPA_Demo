@@ -42,7 +42,7 @@ export default function Policies() {
                     <td className="r num">{kes(p.quote?.instalment)} <span className="sub">{perLabel(p.quote?.plan)}</span></td>
                     <td className="hide-sm">{p.quote?.plan}</td>
                     <td className="hide-sm">{p.quote?.coverStart}</td>
-                    <td><span className="badge ok">{p.status}</span></td>
+                    <td><span className={"badge " + (p.status === "Bound" ? "ok" : "warn")}>{p.status}</span></td>
                   </tr>
                 );
               })}
